@@ -113,6 +113,8 @@ def scan_file(path):
     av_proc = Popen(
         [
             CLAMSCAN_PATH,
+            "--max-filesize=%dM" % AV_SCAN_MAX_SIZE_MB,
+            "--max-scansize=%dM" % 2 * AV_SCAN_MAX_SIZE_MB, # in the case of a zipped file, extracted files' total size will be larger than zip size
             "-v",
             "-a",
             "--stdout",
