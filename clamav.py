@@ -118,6 +118,8 @@ def scan_file(path):
             "-v",
             "-a",
             "--stdout",
+            "--infected",
+            "--no-summary",
             "-d",
             AV_DEFINITION_PATH,
             path
@@ -126,8 +128,7 @@ def scan_file(path):
         stdout=PIPE,
         env=av_env
     )
-    output = av_proc.communicate()[0]
-    print("clamscan output:\n%s" % output)
+    output = av_proc.communicate()[0] #TODO: need to handle multiple files
     if av_proc.returncode == 0:
         return AV_STATUS_CLEAN
     elif av_proc.returncode == 1:
