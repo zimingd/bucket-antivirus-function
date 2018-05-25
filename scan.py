@@ -18,6 +18,7 @@ import copy
 import json
 import metrics
 import urllib
+import time
 from common import *
 from datetime import datetime
 from distutils.util import strtobool
@@ -116,8 +117,8 @@ def sns_scan_results(s3_object, result):
         "bucket": s3_object.bucket_name,
         "key": s3_object.key,
         "version": s3_object.version_id,
-        AV_STATUS_METADATA: result,
-        AV_TIMESTAMP_METADATA: datetime.utcnow().strftime("%Y/%m/%d %H:%M:%S UTC")
+        "scanStatus": result,
+        "scanTime": int(time.time() * 1000)
     }
     sns_client = boto3.client("sns")
     sns_client.publish(
