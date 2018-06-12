@@ -26,6 +26,12 @@ ENV = os.getenv("ENV", "")
 
 
 def event_object(event):
+    # If the event message came from S3->SNS->Lambda instead of directly from S3->Lambda,
+    # the actual event message from S3 is stored in the 'Message' part of the SNS message
+    if 'Message' in event:
+        event = json.loads(event['Message'])
+
+    #Retrieve the bucket and key from the S3 event message
     bucket = event['Records'][0]['s3']['bucket']['name']
     key = urllib.unquote_plus(event['Records'][0]['s3']['object']['key'].encode('utf8'))
     if (not bucket) or (not key):
