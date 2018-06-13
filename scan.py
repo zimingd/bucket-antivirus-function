@@ -28,16 +28,19 @@ ENV = os.getenv("ENV", "")
 def event_object(event):
     # If the event message came from S3->SNS->Lambda instead of directly from S3->Lambda,
     # the actual event message from S3 is stored in the 'Message' part of the SNS message
-    print(event)
-    if 'Message' in event:
-        print("Parsed message in event:")
-        event = json.loads(event['Message'])
-        print(event)
+    if 'Sns' in event['Records'][0]:
+        event = json.loads(event['Records'][0]['Sns']['Message'])
 
+    #We can ignore tests sent by S3 to verify that it has permission to send notifications
+    if event.get('Event') == 's3:TestEvent':
+        print("Received s3 test event. Nothing to scan")
+        return None
+
+    record=event['Records'][0]
 
     #Retrieve the bucket and key from the S3 event message
-    bucket = event['Records'][0]['s3']['bucket']['name']
-    key = urllib.unquote_plus(event['Records'][0]['s3']['object']['key'].encode('utf8'))
+    bucket = record['s3']['bucket']['name']
+    key = urllib.unquote_plus(record['s3']['object']['key'].encode('utf8'))
     if (not bucket) or (not key):
         print("Unable to retrieve object from event.\n%s" % event)
         raise Exception("Unable to retrieve object from event.")
@@ -162,6 +165,9 @@ def lambda_handler(event, context):
     print("Script starting at %s\n" %
           (start_time.strftime("%Y/%m/%d %H:%M:%S UTC")))
     s3_object = event_object(event)
+    if s3_object is None:
+        return
+
     scan_result = scan_object(s3_object)
     print("Scan of s3://%s resulted in %s\n" % (os.path.join(s3_object.bucket_name, s3_object.key), scan_result))
     if "AV_UPDATE_METADATA" in os.environ:
