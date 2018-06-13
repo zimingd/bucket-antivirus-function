@@ -104,7 +104,7 @@
                   "Arn"
                ]
             },
-            "Action":"lambda:InvokeFunction",
+            "Action":"lambda:invokeFunction",
             "Principal":"events.amazonaws.com",
             "SourceArn":{
                "Fn::GetAtt":[
@@ -126,11 +126,8 @@
                   "Arn"
                ]
             },
-            "Action":"lambda:InvokeFunction",
+            "Action":"lambda:invokeFunction",
             "Principal":"sns.amazonaws.com",
-            "SourceAccount":{
-               "Ref":"AWS::AccountId"
-            },
             "SourceArn":{
                "Ref":"ScanTriggerSNSTopic"
             }

@@ -28,8 +28,12 @@ ENV = os.getenv("ENV", "")
 def event_object(event):
     # If the event message came from S3->SNS->Lambda instead of directly from S3->Lambda,
     # the actual event message from S3 is stored in the 'Message' part of the SNS message
+    print(event)
     if 'Message' in event:
+        print("Parsed message in event:")
         event = json.loads(event['Message'])
+        print(event)
+
 
     #Retrieve the bucket and key from the S3 event message
     bucket = event['Records'][0]['s3']['bucket']['name']
@@ -144,7 +148,13 @@ def scan_object(s3_object):
     sns_start_scan(s3_object)
     clamav.update_defs_from_s3(AV_DEFINITION_S3_BUCKET, AV_DEFINITION_S3_PREFIX)
     file_path = download_s3_object(s3_object, "/tmp")
-    return clamav.scan_file(file_path)
+    scan_result = clamav.scan_file(file_path)
+    # Delete downloaded file to free up room on re-usable lambda function container
+    try:
+        os.remove(file_path)
+    except OSError:
+        pass
+    return scan_result
 
 
 def lambda_handler(event, context):
@@ -159,11 +169,6 @@ def lambda_handler(event, context):
     set_av_tags(s3_object, scan_result)
     sns_scan_results(s3_object, scan_result)
     metrics.send(env=ENV, bucket=s3_object.bucket_name, key=s3_object.key, status=scan_result)
-    # Delete downloaded file to free up room on re-usable lambda function container
-    try:
-        os.remove(file_path)
-    except OSError:
-        pass
     print("Script finished at %s\n" %
           datetime.utcnow().strftime("%Y/%m/%d %H:%M:%S UTC"))
 
