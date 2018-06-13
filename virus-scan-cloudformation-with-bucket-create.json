@@ -30,7 +30,7 @@
                "TopicConfigurations":[
                   {
                      "Event":"s3:ObjectCreated:*",
-                     "Function":{
+                     "Topic":{
                         "Ref":"ScanTriggerSNSTopic"
                      }
                   }
