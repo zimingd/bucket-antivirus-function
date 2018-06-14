@@ -17,24 +17,74 @@
    },
    "Resources":{
       "ModifyBucketNotification":{
-         "Type" : "AWS::CloudFormation::CustomResource",
-         "Version" : "1.0",   
+         "Type":"AWS::CloudFormation::CustomResource",
+         "Version":"1.0",
          "Properties":{
-                "ServiceToken": {
-                     "Fn::GetAtt":[
-                        "BucketNotificationConfigUpdateLambda",
-                        "Arn"
+            "ServiceToken":{
+               "Fn::GetAtt":[
+                  "BucketNotificationConfigUpdateLambda",
+                  "Arn"
+               ]
+            },
+            "NotificationKwargs":{
+               "Bucket":{
+                  "Ref":"BucketToScanName"
+               },
+               "NotificationConfiguration":[
+                  {
+                     "Id":"bucket-scan-notify-sns",
+                     "TopicArn":{
+                        "Ref":"ScanTriggerSNSTopic"
+                     },
+                     "Events":[
+                        "s3:ObjectCreated:*"
                      ]
-                  },
-                  "StackName": {
-      "Ref": "NetworkStackName"
-    }
+                  }
+               ]
+            }
          }
       },
       "BucketNotificationConfigUpdateLambda":{
-TODO TODO TODO TODO TODO TODO TODO TODO TODO
+         "Type":"AWS::Lambda::Function",
+         "DependsOn":[
+            "VirusScanDefinitionUpdaterLambda",
+            "ScanTriggerSNSTopic"
+         ],
+         "Properties":{
+            "Code":{
+               "ZipFile":{
+                  "Fn::Join":[
+                     "\n",
+                     [
+                        "import json",
+                        "import cfnresponse",
+                        "import boto3",
+                        "def handler(event, context):",
+                        "   print(event)",
+                        "   print(context)",
+                        "   s3_client = boto3.s3_client('s3')",
+                        "   notification_kwargs = event['ResourceProperties']['NotificationKwargs']",
+                        "   print(s3_client.get_bucket_notification_configuration(Bucket=notification_kwargs['Bucket'])",
+                        "   responseValue = int(event['ResourceProperties']['Input']) * 5",
+                        "   responseData = {}",
+                        "   responseData['Data'] = ''",
+                        "   cfnresponse.send(event, context, cfnresponse.SUCCESS, responseData)"
+                     ]
+                  ]
+               }
+            },
+            "Description":"Lambda used to update a bucket's notification setting ",
+            "Handler":"lambda_function.lambda_handler",
+            "Role":{
+               "Fn::GetAtt":[
+                  "VirusScannerRole",
+                  "Arn"
+               ]
+            },
+            "Runtime":"python2.7",
+            "Timeout":100
+         }
       },
-
       "BucketToScan":{
          "Type":"AWS::S3::Bucket",
          "DependsOn":[
