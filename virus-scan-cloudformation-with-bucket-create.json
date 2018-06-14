@@ -16,6 +16,25 @@
       }
    },
    "Resources":{
+      "ModifyBucketNotification":{
+         "Type" : "AWS::CloudFormation::CustomResource",
+         "Version" : "1.0",   
+         "Properties":{
+                "ServiceToken": {
+                     "Fn::GetAtt":[
+                        "BucketNotificationConfigUpdateLambda",
+                        "Arn"
+                     ]
+                  },
+                  "StackName": {
+      "Ref": "NetworkStackName"
+    }
+         }
+      },
+      "BucketNotificationConfigUpdateLambda":{
+TODO TODO TODO TODO TODO TODO TODO TODO TODO
+      },
+
       "BucketToScan":{
          "Type":"AWS::S3::Bucket",
          "DependsOn":[
