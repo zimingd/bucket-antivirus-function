@@ -19,6 +19,7 @@
       "ModifyBucketNotification":{
          "Type":"AWS::CloudFormation::CustomResource",
          "Version":"1.0",
+         "DependsOn":["BucketToScan"],
          "Properties":{
             "ServiceToken":{
                "Fn::GetAtt":[
@@ -30,8 +31,8 @@
                "Bucket":{
                   "Ref":"BucketToScanName"
                },
-               "NotificationConfiguration":[
-                  {
+               "NotificationConfiguration":{
+                  "TopicConfigurations":[{
                      "Id":"bucket-scan-notify-sns",
                      "TopicArn":{
                         "Ref":"ScanTriggerSNSTopic"
@@ -39,8 +40,8 @@
                      "Events":[
                         "s3:ObjectCreated:*"
                      ]
-                  }
-               ]
+                  }]
+               }
             }
          }
       },
@@ -59,22 +60,35 @@
                         "import json",
                         "import cfnresponse",
                         "import boto3",
-                        "def handler(event, context):",
+                        "from collections import defaultdict",
+
+                        "def lambda_handler(event, context):",
                         "   print(event)",
-                        "   print(context)",
-                        "   s3_client = boto3.s3_client('s3')",
-                        "   notification_kwargs = event['ResourceProperties']['NotificationKwargs']",
-                        "   print(s3_client.get_bucket_notification_configuration(Bucket=notification_kwargs['Bucket'])",
-                        "   responseValue = int(event['ResourceProperties']['Input']) * 5",
                         "   responseData = {}",
                         "   responseData['Data'] = ''",
-                        "   cfnresponse.send(event, context, cfnresponse.SUCCESS, responseData)"
+                       	"   try:",
+                        "      s3_client = boto3.client('s3')",
+                        "      notification_kwargs = event['ResourceProperties']['NotificationKwargs']",
+                        "      new_notification_config_id = notification_kwargs['NotificationConfiguration']['TopicConfigurations'][0]['Id']"
+                        "      curr_notification_config = s3_client.get_bucket_notification_configuration(Bucket=notification_kwargs['Bucket'])",
+                        "      curr_notification_config.pop('ResponseMetadata')",
+                        "      merged_notification_config = defaultdict(list)",
+                        "      merged_notification_config.update(notification_kwargs['NotificationConfiguration']",
+                        "      for k,v in curr_notification_config.iteritems():",
+                        "         merged_notification_config[k].extend(v)"
+                        "      notification_kwargs['NotificationConfiguration'] = merged_notification_config",
+                        "      if event['RequestType'] == 'Delete':",
+                        "         merged_notification_config['TopicConfigurations'] = [x for x in merged_notification_config['TopicConfigurations'] if x['Id'] != new_notification_config_id]",
+                        "      s3_client.put_bucket_notification_configuration(**notification_kwargs)",
+                        "      cfnresponse.send(event, context, cfnresponse.SUCCESS, responseData)",
+                        "   except:",
+                        "      cfnresponse.send(event, context, cfnresponse.FAILED, responseData)"
                      ]
                   ]
                }
             },
             "Description":"Lambda used to update a bucket's notification setting ",
-            "Handler":"lambda_function.lambda_handler",
+            "Handler":"index.lambda_handler",
             "Role":{
                "Fn::GetAtt":[
                   "VirusScannerRole",
@@ -94,21 +108,12 @@
          "Properties":{
             "BucketName":{
                "Ref":"BucketToScanName"
-            },
-            "NotificationConfiguration":{
-               "TopicConfigurations":[
-                  {
-                     "Event":"s3:ObjectCreated:*",
-                     "Topic":{
-                        "Ref":"ScanTriggerSNSTopic"
-                     }
-                  }
-               ]
             }
          }
       },
       "DenyInfectedObjectDownloadPolicy":{
          "Type":"AWS::S3::BucketPolicy",
+         "DependsOn":["BucketToScan"],
          "Properties":{
             "Bucket":{
                "Ref":"BucketToScanName"
