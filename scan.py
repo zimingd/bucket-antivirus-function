@@ -137,6 +137,7 @@ def sns_scan_results(s3_object, result):
     }
     sns_client = boto3.client("sns")
     sns_client.publish(
+        Subject="INFECTED File found in S3 Bucket!",
         TargetArn=AV_STATUS_SNS_ARN,
         Message=json.dumps({'default': json.dumps(message)}),
         MessageStructure="json"

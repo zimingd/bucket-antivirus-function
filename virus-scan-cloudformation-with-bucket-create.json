@@ -13,6 +13,10 @@
       "BucketToScanName":{
          "Type":"String",
          "Description":"The name of the S3 bucket to be created for scanning"
+      },
+      "InfectedFileNotificationEmail":{
+         "Type":"String",
+         "Description":"Email address to be notified when an INFECTED file is found"
       }
    },
    "Resources":{
@@ -336,6 +340,10 @@
                      ]
                   },
                   "Protocol":"sqs"
+               },
+               {
+                  "Endpoint":{"Ref": "InfectedFileNotificationEmail"},
+                  "Protocol":"email"
                }
             ]
          },
