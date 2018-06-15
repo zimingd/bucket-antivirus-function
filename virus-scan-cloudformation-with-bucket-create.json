@@ -16,14 +16,14 @@
       }
    },
    "Resources":{
-      "ModifyBucketNotification":{
+      "VirusScanStackInit":{
          "Type":"AWS::CloudFormation::CustomResource",
          "Version":"1.0",
-         "DependsOn":["BucketToScan"],
+         "Description":"Sets up notification for the BucketToScanName and triggers the VirusScanDefinitionUpdaterLambda to run once",
          "Properties":{
             "ServiceToken":{
                "Fn::GetAtt":[
-                  "BucketNotificationConfigUpdateLambda",
+                  "VirusScanStackInitLambda",
                   "Arn"
                ]
             },
@@ -32,25 +32,34 @@
                   "Ref":"BucketToScanName"
                },
                "NotificationConfiguration":{
-                  "TopicConfigurations":[{
-                     "Id":"bucket-scan-notify-sns",
-                     "TopicArn":{
-                        "Ref":"ScanTriggerSNSTopic"
-                     },
-                     "Events":[
-                        "s3:ObjectCreated:*"
-                     ]
-                  }]
+                  "TopicConfigurations":[
+                     {
+                        "Id":"bucket-scan-notify-sns",
+                        "TopicArn":{
+                           "Ref":"ScanTriggerSNSTopic"
+                        },
+                        "Events":[
+                           "s3:ObjectCreated:*"
+                        ]
+                     }
+                  ]
                }
+            },
+            "VirusDefinitionUpdateLambdaName":{
+               "Ref":"VirusScanDefinitionUpdaterLambda"
+            },
+            "VirusDefinitionBucketName":{
+               "Ref":"ClamavVirusDefinitionsBucket"
             }
          }
       },
-      "BucketNotificationConfigUpdateLambda":{
+      "VirusScanStackInitLambda":{
          "Type":"AWS::Lambda::Function",
          "DependsOn":[
             "VirusScanDefinitionUpdaterLambda",
             "ScanTriggerSNSTopic"
          ],
+         "Description":"Sets up notification for the BucketToScanName and triggers the VirusScanDefinitionUpdaterLambda to run once",
          "Properties":{
             "Code":{
                "ZipFile":{
@@ -61,28 +70,36 @@
                         "import cfnresponse",
                         "import boto3",
                         "from collections import defaultdict",
-
                         "def lambda_handler(event, context):",
                         "   print(event)",
                         "   responseData = {}",
                         "   responseData['Data'] = ''",
-                       	"   try:",
+                        "   try:",
                         "      s3_client = boto3.client('s3')",
                         "      notification_kwargs = event['ResourceProperties']['NotificationKwargs']",
-                        "      new_notification_config_id = notification_kwargs['NotificationConfiguration']['TopicConfigurations'][0]['Id']"
+                        "      new_notification_config_id = notification_kwargs['NotificationConfiguration']['TopicConfigurations'][0]['Id']",
                         "      curr_notification_config = s3_client.get_bucket_notification_configuration(Bucket=notification_kwargs['Bucket'])",
                         "      curr_notification_config.pop('ResponseMetadata')",
                         "      merged_notification_config = defaultdict(list)",
-                        "      merged_notification_config.update(notification_kwargs['NotificationConfiguration']",
+                        "      merged_notification_config.update(notification_kwargs['NotificationConfiguration'])",
                         "      for k,v in curr_notification_config.iteritems():",
-                        "         merged_notification_config[k].extend(v)"
+                        "         merged_notification_config[k].extend(v)",
                         "      notification_kwargs['NotificationConfiguration'] = merged_notification_config",
+                        "      if event['RequestType'] == 'Create':",
+                        "         print('triggering virus definition update lambda function')",
+                        "         lambda_client = boto3.client('lambda')",
+                        "         lambda_client.invoke(FunctionName=event['ResourceProperties']['VirusDefinitionUpdateLambdaName'],InvocationType='Event')",
                         "      if event['RequestType'] == 'Delete':",
+                        "         print('Deleting objects from virus definition bucket')",
+                        "         virus_def_bucket = boto3.resource('s3').Bucket(event['ResourceProperties']['VirusDefinitionBucketName'])",
+                        "         virus_def_bucket.objects.all().delete()",
                         "         merged_notification_config['TopicConfigurations'] = [x for x in merged_notification_config['TopicConfigurations'] if x['Id'] != new_notification_config_id]",
+                        "      print('Modifying notification configuration')",
                         "      s3_client.put_bucket_notification_configuration(**notification_kwargs)",
                         "      cfnresponse.send(event, context, cfnresponse.SUCCESS, responseData)",
                         "   except:",
-                        "      cfnresponse.send(event, context, cfnresponse.FAILED, responseData)"
+                        "      cfnresponse.send(event, context, cfnresponse.FAILED, responseData)",
+                        "      raise"
                      ]
                   ]
                }
@@ -91,7 +108,7 @@
             "Handler":"index.lambda_handler",
             "Role":{
                "Fn::GetAtt":[
-                  "VirusScannerRole",
+                  "VirusScanStackInitRole",
                   "Arn"
                ]
             },
@@ -99,21 +116,8 @@
             "Timeout":100
          }
       },
-      "BucketToScan":{
-         "Type":"AWS::S3::Bucket",
-         "DependsOn":[
-            "VirusScannerLambda",
-            "VirusScannerLambdaInvokePermission"
-         ],
-         "Properties":{
-            "BucketName":{
-               "Ref":"BucketToScanName"
-            }
-         }
-      },
       "DenyInfectedObjectDownloadPolicy":{
          "Type":"AWS::S3::BucketPolicy",
-         "DependsOn":["BucketToScan"],
          "Properties":{
             "Bucket":{
                "Ref":"BucketToScanName"
@@ -432,6 +436,93 @@
          "Type":"AWS::SQS::Queue",
          "Properties":{
 
+         }
+      },
+      "VirusScanStackInitRole":{
+         "Type":"AWS::IAM::Role",
+         "DependsOn":[
+            "ClamavVirusDefinitionsBucket",
+            "ScanResultSNSTopic",
+            "VirusScanDeadLetterQueue"
+         ],
+         "Properties":{
+            "AssumeRolePolicyDocument":{
+               "Version":"2012-10-17",
+               "Statement":[
+                  {
+                     "Effect":"Allow",
+                     "Principal":{
+                        "Service":"lambda.amazonaws.com"
+                     },
+                     "Action":"sts:AssumeRole"
+                  }
+               ]
+            },
+            "Path":"/",
+            "Policies":[
+               {
+                  "PolicyName":"virus-scan-stack-init-policy",
+                  "PolicyDocument":{
+                     "Version":"2012-10-17",
+                     "Statement":[
+                        {
+                           "Effect":"Allow",
+                           "Action":[
+                              "logs:CreateLogGroup",
+                              "logs:CreateLogStream",
+                              "logs:PutLogEvents"
+                           ],
+                           "Resource":"*"
+                        },
+                        {
+                           "Effect":"Allow",
+                           "Action":[
+                              "lambda:InvokeFunction"
+                           ],
+                           "Resource":"*"
+                        },
+                        {
+                           "Action":[
+                              "s3:*"
+                           ],
+                           "Effect":"Allow",
+                           "Resource":{
+                              "Fn::Join":[
+                                 "",
+                                 [
+                                    {
+                                       "Fn::GetAtt":[
+                                          "ClamavVirusDefinitionsBucket",
+                                          "Arn"
+                                       ]
+                                    },
+                                    "*"
+                                 ]
+                              ]
+                           }
+                        },
+                        {
+                           "Action":[
+                              "s3:GetBucketNotification",
+                              "s3:PutBucketNotification"
+                           ],
+                           "Effect":"Allow",
+                           "Resource":{
+                              "Fn::Join":[
+                                 "",
+                                 [
+                                    "arn:aws:s3:::",
+                                    {
+                                       "Ref":"BucketToScanName"
+                                    }
+                                 ]
+                              ]
+                           }
+                        }
+                     ]
+                  }
+               }
+            ]
          }
       },
       "VirusDefinitionUpdateRole":{
