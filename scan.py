@@ -26,8 +26,21 @@ ENV = os.getenv("ENV", "")
 
 
 def event_object(event):
-    bucket = event['Records'][0]['s3']['bucket']['name']
-    key = urllib.unquote_plus(event['Records'][0]['s3']['object']['key'].encode('utf8'))
+    # If the event message came from S3->SNS->Lambda instead of directly from S3->Lambda,
+    # the actual event message from S3 is stored in the 'Message' part of the SNS message
+    if 'Sns' in event['Records'][0]:
+        event = json.loads(event['Records'][0]['Sns']['Message'])
+
+    #We can ignore tests sent by S3 to verify that it has permission to send notifications
+    if event.get('Event') == 's3:TestEvent':
+        print("Received s3 test event. Nothing to scan")
+        return None
+
+    record=event['Records'][0]
+
+    #Retrieve the bucket and key from the S3 event message
+    bucket = record['s3']['bucket']['name']
+    key = urllib.unquote_plus(record['s3']['object']['key'].encode('utf8'))
     if (not bucket) or (not key):
         print("Unable to retrieve object from event.\n%s" % event)
         raise Exception("Unable to retrieve object from event.")
@@ -112,6 +125,9 @@ def sns_start_scan(s3_object):
 def sns_scan_results(s3_object, result):
     if AV_STATUS_SNS_ARN is None:
         return
+    if result != AV_STATUS_INFECTED: #Only notify for infected files
+        return
+
     message = {
         "bucket": s3_object.bucket_name,
         "key": s3_object.key,
@@ -121,10 +137,28 @@ def sns_scan_results(s3_object, result):
     }
     sns_client = boto3.client("sns")
     sns_client.publish(
+        Subject="INFECTED File found in S3 Bucket!",
         TargetArn=AV_STATUS_SNS_ARN,
         Message=json.dumps({'default': json.dumps(message)}),
         MessageStructure="json"
     )
+
+
+def scan_object(s3_object):
+    if s3_object.content_length > AV_SCAN_MAX_FILE_SIZE_BYTES:
+        return AV_STATUS_SKIPPED
+
+    verify_s3_object_version(s3_object)
+    sns_start_scan(s3_object)
+    clamav.update_defs_from_s3(AV_DEFINITION_S3_BUCKET, AV_DEFINITION_S3_PREFIX)
+    file_path = download_s3_object(s3_object, "/tmp")
+    scan_result = clamav.scan_file(file_path)
+    # Delete downloaded file to free up room on re-usable lambda function container
+    try:
+        os.remove(file_path)
+    except OSError:
+        pass
+    return scan_result
 
 
 def lambda_handler(event, context):
@@ -132,22 +166,16 @@ def lambda_handler(event, context):
     print("Script starting at %s\n" %
           (start_time.strftime("%Y/%m/%d %H:%M:%S UTC")))
     s3_object = event_object(event)
-    verify_s3_object_version(s3_object)
-    sns_start_scan(s3_object)
-    file_path = download_s3_object(s3_object, "/tmp")
-    clamav.update_defs_from_s3(AV_DEFINITION_S3_BUCKET, AV_DEFINITION_S3_PREFIX)
-    scan_result = clamav.scan_file(file_path)
+    if s3_object is None:
+        return
+
+    scan_result = scan_object(s3_object)
     print("Scan of s3://%s resulted in %s\n" % (os.path.join(s3_object.bucket_name, s3_object.key), scan_result))
     if "AV_UPDATE_METADATA" in os.environ:
         set_av_metadata(s3_object, scan_result)
     set_av_tags(s3_object, scan_result)
     sns_scan_results(s3_object, scan_result)
     metrics.send(env=ENV, bucket=s3_object.bucket_name, key=s3_object.key, status=scan_result)
-    # Delete downloaded file to free up room on re-usable lambda function container
-    try:
-        os.remove(file_path)
-    except OSError:
-        pass
     print("Script finished at %s\n" %
           datetime.utcnow().strftime("%Y/%m/%d %H:%M:%S UTC"))
 
