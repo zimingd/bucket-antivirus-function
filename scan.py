@@ -161,7 +161,7 @@ def scan_object(s3_object):
         scan_result = clamav.scan_file(file_path)
         # Delete downloaded file to free up room on re-usable lambda function container
     finally:
-        try
+        try:
             shutil.rmtree(tempdir)
         except OSError:
             pass
