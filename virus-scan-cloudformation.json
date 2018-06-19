@@ -658,6 +658,23 @@
                         },
                         {
                            "Action":[
+                              "s3:ListBucket"
+                           ],
+                           "Effect":"Allow",
+                           "Resource":{
+                              "Fn::Join":[
+                                 "",
+                                 [
+                                    "arn:aws:s3:::",
+                                    {
+                                       "Ref":"BucketToScanName"
+                                    }
+                                 ]
+                              ]
+                           }
+                        },
+                        {
+                           "Action":[
                               "s3:GetObject",
                               "s3:GetObjectTagging",
                               "s3:PutObject",
