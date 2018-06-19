@@ -18,6 +18,8 @@ import clamav
 import copy
 import json
 import metrics
+import shutil
+import tempfile
 import urllib
 from common import *
 from datetime import datetime
@@ -153,13 +155,16 @@ def scan_object(s3_object):
     verify_s3_object_version(s3_object)
     sns_start_scan(s3_object)
     clamav.update_defs_from_s3(AV_DEFINITION_S3_BUCKET, AV_DEFINITION_S3_PREFIX)
-    file_path = download_s3_object(s3_object, "/tmp")
-    scan_result = clamav.scan_file(file_path)
-    # Delete downloaded file to free up room on re-usable lambda function container
+    tempdir = tempfile.mkdtemp()
     try:
-        os.remove(file_path)
-    except OSError:
-        pass
+        file_path = download_s3_object(s3_object, tempdir)
+        scan_result = clamav.scan_file(file_path)
+        # Delete downloaded file to free up room on re-usable lambda function container
+    finally:
+        try
+            shutil.rmtree(tempdir)
+        except OSError:
+            pass
     return scan_result
 
 
