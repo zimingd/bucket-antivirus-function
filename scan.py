@@ -41,7 +41,7 @@ def event_object(event):
     #Retrieve the bucket and key from the S3 event message
     bucket = record['s3']['bucket']['name']
     key = urllib.unquote_plus(record['s3']['object']['key'].encode('utf8'))
-    print("Scanning key=" + key +" | bucket=" + bucket)
+    print("Scanning on event=" + record['eventName'] +" | key=" + key +" | bucket=" + bucket)
     if (not bucket) or (not key):
         print("Unable to retrieve object from event.\n%s" % event)
         raise Exception("Unable to retrieve object from event.")
@@ -163,6 +163,7 @@ def scan_object(s3_object):
 
 
 def lambda_handler(event, context):
+    print(event)
     start_time = datetime.utcnow()
     print("Script starting at %s\n" %
           (start_time.strftime("%Y/%m/%d %H:%M:%S UTC")))
