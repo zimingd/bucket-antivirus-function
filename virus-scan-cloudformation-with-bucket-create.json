@@ -342,7 +342,9 @@
                   "Protocol":"sqs"
                },
                {
-                  "Endpoint":{"Ref": "InfectedFileNotificationEmail"},
+                  "Endpoint":{
+                     "Ref":"InfectedFileNotificationEmail"
+                  },
                   "Protocol":"email"
                }
             ]
@@ -635,10 +637,48 @@
                         },
                         {
                            "Action":[
-                              "s3:*"
+                              "s3:GetObject",
+                              "s3:GetObjectTagging",
+                              "s3:PutObjectTagging",
+                              "s3:PutObjectVersionTagging"
                            ],
                            "Effect":"Allow",
-                           "Resource":"*"
+                           "Resource":{
+                              "Fn::Join":[
+                                 "",
+                                 [
+                                    "arn:aws:s3:::",
+                                    {
+                                       "Ref":"BucketToScanName"
+                                    },
+                                    "/*"
+                                 ]
+                              ]
+                           }
+                        },
+                        {
+                           "Action":[
+                              "s3:GetObject",
+                              "s3:GetObjectTagging",
+                              "s3:PutObject",
+                              "s3:PutObjectTagging",
+                              "s3:PutObjectVersionTagging"
+                           ],
+                           "Effect":"Allow",
+                           "Resource":{
+                              "Fn::Join":[
+                                 "",
+                                 [
+                                    {
+                                       "Fn::GetAtt":[
+                                          "ClamavVirusDefinitionsBucket",
+                                          "Arn"
+                                       ]
+                                    },
+                                    "/*"
+                                 ]
+                              ]
+                           }
                         },
                         {
                            "Action":[
