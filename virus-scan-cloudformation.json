@@ -43,7 +43,7 @@
                            "Ref":"ScanTriggerSNSTopic"
                         },
                         "Events":[
-                           "s3:ObjectCreated:*"
+                           "s3:ObjectCreated:CompleteMultipartUpload"
                         ]
                      }
                   ]
