@@ -177,22 +177,16 @@ def lambda_handler(event, context):
     if s3_object is None:
         return
 
-    try:
-        scan_result = scan_object(s3_object)
-        print("Scan of s3://%s resulted in %s\n" % (os.path.join(s3_object.bucket_name, s3_object.key), scan_result))
-        if "AV_UPDATE_METADATA" in os.environ:
-            set_av_metadata(s3_object, scan_result)
-        set_av_tags(s3_object, scan_result)
-        sns_scan_results(s3_object, scan_result)
-        metrics.send(env=ENV, bucket=s3_object.bucket_name, key=s3_object.key, status=scan_result)
-        print("Script finished at %s\n" %
-              datetime.utcnow().strftime("%Y/%m/%d %H:%M:%S UTC"))
-    except botocore.exceptions.ClientError as e:
-        error_code = int(e.response['Error']['Code'])
-        if error_code == 404:
-            print("Skipping scan because key=" + s3_object.key +" was not found. It was likely a partial chunk in a multi-part upload (indicated by a '/<integer>' suffix in the key).")
-        else:
-            raise
+    scan_result = scan_object(s3_object)
+    print("Scan of s3://%s resulted in %s\n" % (os.path.join(s3_object.bucket_name, s3_object.key), scan_result))
+    if "AV_UPDATE_METADATA" in os.environ:
+        set_av_metadata(s3_object, scan_result)
+    set_av_tags(s3_object, scan_result)
+    sns_scan_results(s3_object, scan_result)
+    metrics.send(env=ENV, bucket=s3_object.bucket_name, key=s3_object.key, status=scan_result)
+    print("Script finished at %s\n" %
+            datetime.utcnow().strftime("%Y/%m/%d %H:%M:%S UTC"))
+
 
 
 def str_to_bool(s):
