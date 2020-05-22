@@ -119,7 +119,7 @@
                   "Arn"
                ]
             },
-            "Runtime":"python2.7",
+            "Runtime":"python3.8",
             "Timeout":100
          }
       },
@@ -375,7 +375,7 @@
                ]
             },
             "Timeout":300,
-            "Runtime":"python2.7",
+            "Runtime":"python3.8",
             "Handler":"scan.lambda_handler",
             "Environment":{
                "Variables":{
@@ -384,7 +384,8 @@
                   },
                   "AV_STATUS_SNS_ARN":{
                      "Ref":"ScanResultSNSTopic"
-                  }
+                  },
+                  "AV_STATUS_SNS_PUBLISH_CLEAN": "False"
                }
             },
             "MemorySize":1024,
@@ -423,7 +424,7 @@
                ]
             },
             "Timeout":300,
-            "Runtime":"python2.7",
+            "Runtime":"python3.8",
             "Handler":"update.lambda_handler",
             "Environment":{
                "Variables":{
