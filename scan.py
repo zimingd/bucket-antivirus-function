@@ -43,9 +43,16 @@ from common import get_timestamp
 
 
 def event_object(event, event_source="s3"):
+    print(json.dumps(event))
+
     # SNS events are slightly different
     if event_source.upper() == "SNS":
         event = json.loads(event["Records"][0]["Sns"]["Message"])
+
+    #We can ignore tests sent by S3 to verify that it has permission to send notifications
+    if event.get('Event') == 's3:TestEvent':
+        print("Received s3 test event. Nothing to scan")
+        return None
 
     # Break down the record
     records = event["Records"]
@@ -217,8 +224,9 @@ def lambda_handler(event, context):
     print("Script starting at %s\n" % (start_time))
     s3_object = event_object(event, event_source=EVENT_SOURCE)
 
-    if s3_object.content_length > AV_SCAN_MAX_FILE_SIZE_BYTES:
-        return AV_STATUS_SKIPPED, AV_SIGNATURE_OK
+    if s3_object is None or s3_object.content_length > AV_SCAN_MAX_FILE_SIZE_BYTES:
+        print("Skipping event")
+        return
 
     if str_to_bool(AV_PROCESS_ORIGINAL_VERSION_ONLY):
         verify_s3_object_version(s3, s3_object)

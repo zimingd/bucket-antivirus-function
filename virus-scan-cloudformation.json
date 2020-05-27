@@ -119,7 +119,7 @@
                   "Arn"
                ]
             },
-            "Runtime":"python3.8",
+            "Runtime":"python2.7",
             "Timeout":100
          }
       },
@@ -375,7 +375,7 @@
                ]
             },
             "Timeout":300,
-            "Runtime":"python3.8",
+            "Runtime":"python3.7",
             "Handler":"scan.lambda_handler",
             "Environment":{
                "Variables":{
@@ -385,7 +385,8 @@
                   "AV_STATUS_SNS_ARN":{
                      "Ref":"ScanResultSNSTopic"
                   },
-                  "AV_STATUS_SNS_PUBLISH_CLEAN": "False"
+                  "AV_STATUS_SNS_PUBLISH_CLEAN": "False",
+                  "EVENT_SOURCE":"SNS"
                }
             },
             "MemorySize":1024,
@@ -424,7 +425,7 @@
                ]
             },
             "Timeout":300,
-            "Runtime":"python3.8",
+            "Runtime":"python3.7",
             "Handler":"update.lambda_handler",
             "Environment":{
                "Variables":{
@@ -433,7 +434,7 @@
                   }
                }
             },
-            "MemorySize":512
+            "MemorySize":1024
          },
          "DependsOn":[
             "ClamavVirusDefinitionsBucket",
@@ -579,7 +580,7 @@
                               "s3:GetObjectTagging",
                               "s3:PutObject",
                               "s3:PutObjectTagging",
-                              "s3:PutObjectVersionTagging"
+                              "s3:PutObjectVersionTagging",
                            ],
                            "Effect":"Allow",
                            "Resource":{
@@ -596,6 +597,18 @@
                                  ]
                               ]
                            }
+                        },
+                        {
+                           "Action":[
+                              "s3:ListBucket"
+                           ],
+                           "Effect":"Allow",
+                           "Resource":{
+                                       "Fn::GetAtt":[
+                                          "ClamavVirusDefinitionsBucket",
+                                          "Arn"
+                                       ]
+                                    }
                         }
                      ]
                   }
@@ -700,6 +713,18 @@
                                  ]
                               ]
                            }
+                        },
+                        {
+                           "Action":[
+                              "s3:ListBucket"
+                           ],
+                           "Effect":"Allow",
+                           "Resource":{
+                                       "Fn::GetAtt":[
+                                          "ClamavVirusDefinitionsBucket",
+                                          "Arn"
+                                       ]
+                                    }
                         },
                         {
                            "Action":[
