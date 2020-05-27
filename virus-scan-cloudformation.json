@@ -580,7 +580,7 @@
                               "s3:GetObjectTagging",
                               "s3:PutObject",
                               "s3:PutObjectTagging",
-                              "s3:PutObjectVersionTagging",
+                              "s3:PutObjectVersionTagging"
                            ],
                            "Effect":"Allow",
                            "Resource":{
