@@ -224,8 +224,12 @@ def lambda_handler(event, context):
     print("Script starting at %s\n" % (start_time))
     s3_object = event_object(event, event_source=EVENT_SOURCE)
 
+    #If not a scannable s3 object in event or file size too large, don't scan
     if s3_object is None or s3_object.content_length > AV_SCAN_MAX_FILE_SIZE_BYTES:
         print("Skipping event")
+        if s3_object:
+            # tag that S3 object was skipped
+            set_av_tags(s3_client, s3_object, AV_STATUS_SKIPPED, AV_SIGNATURE_OK, start_time)
         return
 
     if str_to_bool(AV_PROCESS_ORIGINAL_VERSION_ONLY):

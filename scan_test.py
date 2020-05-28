@@ -81,6 +81,16 @@ class TestScan(unittest.TestCase):
         expected_s3_object = self.s3.Object(self.s3_bucket_name, self.s3_key_name)
         self.assertEquals(s3_obj, expected_s3_object)
 
+    def test_s3_event_test_object(self):
+        event = {'Service': 'Amazon S3',
+                 'Event': 's3:TestEvent',
+                 'Time': '2020-05-27T12:08:55.740Z',
+                 'Bucket': 'test.bucket',
+                 'RequestId': '123123123123123123123123',
+                 'HostId': 'asdfasdfasdfasdfasdfasdfasdfasdfasfdasdfasdf'}
+        s3_obj = event_object(event)
+        self.assertIsNone(s3_obj)
+
     def test_s3_event_object_missing_bucket(self):
         event = {"Records": [{"s3": {"object": {"key": self.s3_key_name}}}]}
         with self.assertRaises(Exception) as cm:
